@@ -1,70 +1,65 @@
-// Get today's date as seed
-export function getTodaySeed() {
+// src/puzzle.js
+
+// Get today's date as YYYY-MM-DD
+export function getTodayDate() {
   const today = new Date();
-  return today.toISOString().slice(0, 10); // YYYY-MM-DD
+  return today.toISOString().split("T")[0];
 }
 
-// Generate a simple sequence puzzle
+// Generate daily puzzle
 export function generatePuzzle() {
-  const seed = getTodaySeed();
-
-  // Simple deterministic numbers based on date
-  const base = seed.charCodeAt(seed.length - 1) % 5 + 2;
-
-  const sequence = [
-    base * 1,
-    base * 2,
-    base * 3,
-    base * 4,
-    "?"
-  ];
-
-  const answer = base * 5;
-
-  return { sequence, answer };
-}
-
-// Validate user answer
-export function checkAnswer(userAnswer, correctAnswer) {
-  return Number(userAnswer) === correctAnswer;
-}
-
-
-
-export function updateStreak(isCorrect) {
-  if (!isCorrect) return getStreak();
-
-  const today = getTodaySeed();
-  const lastDate = localStorage.getItem("lastSolvedDate");
-  let streak = Number(localStorage.getItem("streak") || 0);
+  const today = getTodayDate();
+  const lastDate = localStorage.getItem("lastPuzzleDate");
 
   if (lastDate === today) {
-    return streak; // already solved today
-  }
-
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yDate = yesterday.toISOString().slice(0, 10);
-
-  if (lastDate === yDate) {
-    streak += 1;
+    // Return same puzzle as today
+    const puzzle = JSON.parse(localStorage.getItem("todayPuzzle"));
+    return puzzle;
   } else {
-    streak = 1;
+    // Generate new puzzle (example: multiples of random number)
+    const start = Math.floor(Math.random() * 10) + 1;
+    const sequence = Array.from({ length: 4 }, (_, i) => start * (i + 1));
+    const answer = start * 5; // next number
+    const puzzle = { sequence, answer };
+
+    // Save to localStorage
+    localStorage.setItem("todayPuzzle", JSON.stringify(puzzle));
+    localStorage.setItem("lastPuzzleDate", today);
+
+    return puzzle;
   }
+}
 
-  localStorage.setItem("streak", streak);
-  localStorage.setItem("lastSolvedDate", today);
+// Get current streak
+export function getStreak() {
+  const streak = parseInt(localStorage.getItem("streak")) || 0;
+  const lastSolved = localStorage.getItem("lastSolvedDate");
+  const today = getTodayDate();
 
+  // Reset streak if last solved was before yesterday
+  if (lastSolved && lastSolved !== today && new Date(lastSolved) < new Date(today)) {
+    return streak;
+  }
   return streak;
 }
 
-export function getStreak() {
-  return Number(localStorage.getItem("streak") || 0);
+// Update streak
+export function updateStreak(correct) {
+  const today = getTodayDate();
+  let streak = parseInt(localStorage.getItem("streak")) || 0;
+
+  if (correct) {
+    const lastSolved = localStorage.getItem("lastSolvedDate");
+    if (lastSolved !== today) {
+      streak += 1;
+      localStorage.setItem("streak", streak);
+      localStorage.setItem("lastSolvedDate", today);
+    }
+  }
+  return streak;
 }
 
-
+// Check if solved today
 export function isSolvedToday() {
-  const today = getTodaySeed();
-  const lastSolvedDate = localStorage.getItem("lastSolvedDate");
-  return lastSolvedDate === today;
+  return localStorage.getItem("lastSolvedDate") === getTodayDate();
 }
