@@ -8,11 +8,11 @@ app = Flask(__name__)
 # Neon PostgreSQL credentials
 # --------------------------
 conn = psycopg2.connect(
-    dbname="neondb",                                   # database name
-    user="neondb_owner",                               # username
-    password="npg_KflGciP1X6kD",                      # password
-    host="ep-muddy-leaf-a1u482lt-pooler.ap-southeast-1.aws.neon.tech",  # host
-    port="5432"                                        # port
+    dbname="neondb",
+    user="neondb_owner",
+    password="npg_KflGciP1X6kD",
+    host="ep-muddy-leaf-a1u482lt-pooler.ap-southeast-1.aws.neon.tech",
+    port="5432"
 )
 cur = conn.cursor()
 
@@ -24,7 +24,7 @@ def create_user():
     data = request.get_json()
     email = data.get("email")
     cur.execute(
-        "INSERT INTO users (email, streak, last_solved_date) VALUES (%s, 0, NULL) ON CONFLICT (email) DO NOTHING RETURNING *",
+        "INSERT INTO users (email, streak_count, last_played) VALUES (%s, 0, NULL) ON CONFLICT (email) DO NOTHING RETURNING *",
         (email,)
     )
     conn.commit()
@@ -38,7 +38,7 @@ def solve_daily():
     data = request.get_json()
     email = data.get("email")
 
-    cur.execute("SELECT streak, last_solved_date FROM users WHERE email=%s", (email,))
+    cur.execute("SELECT streak_count, last_played FROM users WHERE email=%s", (email,))
     user = cur.fetchone()
     if not user:
         return jsonify({"error": "User not found"}), 404
@@ -49,22 +49,27 @@ def solve_daily():
     if last_solved != today:
         streak += 1
         cur.execute(
-            "UPDATE users SET streak=%s, last_solved_date=%s WHERE email=%s",
+            "UPDATE users SET streak_count=%s, last_played=%s WHERE email=%s",
             (streak, today, email)
         )
         conn.commit()
 
-    return jsonify({"email": email, "streak": streak})
+    # Return top 10 leaderboard
+    cur.execute("SELECT email, streak_count FROM users ORDER BY streak_count DESC LIMIT 10")
+    users = cur.fetchall()
+    leaderboard = [{"email": u[0], "streak": u[1]} for u in users]
+
+    return jsonify({"email": email, "streak": streak, "leaderboard": leaderboard})
 
 # --------------------------
 # Leaderboard endpoint
 # --------------------------
 @app.route("/leaderboard", methods=["GET"])
 def leaderboard():
-    cur.execute("SELECT email, streak FROM users ORDER BY streak DESC")
+    cur.execute("SELECT email, streak_count FROM users ORDER BY streak_count DESC LIMIT 10")
     users = cur.fetchall()
-    result = [{"email": u[0], "streak": u[1]} for u in users]
-    return jsonify(result)
+    leaderboard = [{"email": u[0], "streak": u[1]} for u in users]
+    return jsonify(leaderboard)
 
 # --------------------------
 if __name__ == "__main__":
